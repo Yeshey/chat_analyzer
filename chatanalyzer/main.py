@@ -78,7 +78,7 @@ def plot_message_timeline(counters):
     plt.legend()
     plt.tight_layout()
 
-    plt.show() # if this fails its fine, the image is also saved in current directory
+    # plt.show() # if this fails its fine, the image is also saved in current directory
     
     # Save the plot instead of showing it
     output_file = 'message_timeline.png'
