@@ -176,3 +176,7 @@ TOP EMOJIS (VICTOR)
 39. 👏 -      3 times (in 1 separate messages)
 40. 🥵 -      3 times (in 2 separate messages)
 ```
+
+![message_timeline](https://github.com/user-attachments/assets/3b204960-ffcd-4722-8b66-dbfc9ed975aa)
+
+
