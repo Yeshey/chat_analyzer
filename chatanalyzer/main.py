@@ -2,93 +2,92 @@
 
 import sys
 import re
-import matplotlib  # Import matplotlib first
-matplotlib.use('Agg')  # Set the backend before importing pyplot
-from collections import Counter
+import matplotlib
+matplotlib.use('Agg')
+from collections import defaultdict, Counter
 from datetime import datetime
 import matplotlib.pyplot as plt
 import pandas as pd
 from dateutil.parser import parse as date_parse
 
-
 def print_metrics(counters, metrics):
-    """Print the main chat statistics metrics"""
+    """Print the main chat statistics metrics with dynamic user names"""
+    users = [u for u in counters['messages'] if u != 'Total']
+    header = f"| {'METRIC':<20} | " + " | ".join([f"{u.upper():<8}" for u in users]) + " | {'TOTAL':<8} |"
+    separator = "|----------------------|" + "|".join(["-"*10 for _ in users]) + "|----------|"
+    
     print("\nCHAT STATISTICS")
-    print("="*40)
-    print(f"| {'METRIC':<20} | {'JONNAS':<8} | {'VICTOR':<8} | {'TOTAL':<8} |")
-    print("|----------------------|----------|----------|----------|")
-    print(f"| {'Total Messages':<20} | {counters['messages']['Jonnas']:>8} | {counters['messages']['Victor']:>8} | {counters['messages']['Total']:>8} |")
-    print(f"| {'Total Words':<20} | {counters['words']['Jonnas']:>8} | {counters['words']['Victor']:>8} | {counters['words']['Jonnas'] + counters['words']['Victor']:>8} |")
-    print(f"| {'Words/Message':<20} | {metrics['words_per_message']['Jonnas']:>8} | {metrics['words_per_message']['Victor']:>8} | {metrics['words_per_message']['Total']:>8} |")
+    print("=" * len(header))
+    print(header)
+    print(separator)
+    
+    # Total Messages
+    msg_line = f"| {'Total Messages':<20} | " + " | ".join([f"{counters['messages'][u]:>8}" for u in users]) + f" | {counters['messages']['Total']:>8} |"
+    print(msg_line)
+    
+    # Total Words
+    words_line = f"| {'Total Words':<20} | " + " | ".join([f"{counters['words'][u]:>8}" for u in users]) + f" | {sum(counters['words'].values()):>8} |"
+    print(words_line)
+    
+    # Words per Message
+    wpm_line = f"| {'Words/Message':<20} | " + " | ".join([f"{metrics['words_per_message'][u]:>8.2f}" for u in users]) + f" | {metrics['words_per_message']['Total']:>8.2f} |"
+    print(wpm_line)
 
 def print_emoji_metrics(counters):
-    """Print emoji statistics using the counters"""
+    """Print emoji statistics with dynamic user names"""
     def print_emojis(title, total_counter, messages_counter):
-        """Helper function to print individual emoji tables"""
         print(f"\n{title}")
         print("-"*60)
         for rank, (emoji, total_count) in enumerate(total_counter.most_common(40), 1):
             message_count = messages_counter.get(emoji, 0)
-            print(f"{rank:2}. {emoji} - {total_count:>6} times (in {message_count} separate messages)")
+            print(f"{rank:2}. {emoji} - {total_count:>6} times (in {message_count} messages)")
 
+    users = [u for u in counters['emojis'] if u != 'Both']
     print_emojis("TOP EMOJIS (BOTH)", counters['emojis']['Both']['total'], counters['emojis']['Both']['messages'])
-    print_emojis("TOP EMOJIS (JONNAS)", counters['emojis']['Jonnas']['total'], counters['emojis']['Jonnas']['messages'])
-    print_emojis("TOP EMOJIS (VICTOR)", counters['emojis']['Victor']['total'], counters['emojis']['Victor']['messages'])
+    for user in users:
+        print_emojis(f"TOP EMOJIS ({user.upper()})", counters['emojis'][user]['total'], counters['emojis'][user]['messages'])
 
 def plot_message_timeline(counters):
-    """Plot message frequency over time using matplotlib"""
+    """Plot message frequency over time with dynamic users"""
     if not counters['dates']:
         print("No date data available for plotting")
         return
-    
-    # Create DataFrame from date records
+
     df = pd.DataFrame(counters['dates'], columns=['user', 'date'])
     df.set_index('date', inplace=True)
     
-    # Resample to monthly frequency
     plt.figure(figsize=(14, 7))
+    users = list(set(u for u, _ in counters['dates']))
     
     # Plot total messages
-    df.resample('ME').size().plot(
-        label='Total Messages', 
-        color='#2c3e50',
-        linewidth=2,
-        marker='o'
-    )
+    total = df.resample('ME').size()
+    if not total.empty:
+        total.plot(label='Total Messages', color='#2c3e50', linewidth=2, marker='o')
     
     # Plot individual users
-    df[df['user'] == 'Jonnas'].resample('ME').size().plot(
-        label='Jonnas', 
-        color='#3498db',
-        linestyle='--',
-        alpha=0.8
-    )
+    colors = ['#3498db', '#e74c3c', '#2ecc71', '#9b59b6'][:len(users)]
+    for user, color in zip(users, colors):
+        user_data = df[df['user'] == user].resample('ME').size()
+        if not user_data.empty:
+            user_data.plot(label=user, color=color, linestyle='--', alpha=0.8)
     
-    df[df['user'] == 'Victor'].resample('ME').size().plot(
-        label='Victor', 
-        color='#e74c3c',
-        linestyle='--',
-        alpha=0.8
-    )
-    
-    plt.title('Message Frequency Over Time', fontsize=14)
-    plt.xlabel('Date', fontsize=12)
-    plt.ylabel('Number of Messages', fontsize=12)
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    plt.tight_layout()
-
-    # plt.show() # if this fails its fine, the image is also saved in current directory
-    
-    # Save the plot instead of showing it
-    output_file = 'message_timeline.png'
-    plt.savefig(output_file)
-    print(f"\nPlot saved as {output_file}")
+    if not df.empty:
+        plt.title('Message Frequency Over Time', fontsize=14)
+        plt.xlabel('Date', fontsize=12)
+        plt.ylabel('Number of Messages', fontsize=12)
+        plt.grid(True, alpha=0.3)
+        plt.legend()
+        plt.tight_layout()
+        output_file = 'message_timeline.png'
+        plt.savefig(output_file)
+        print(f"\nPlot saved as {output_file}")
+    else:
+        print("No valid data for plotting timeline")
 
 def process_chat_data(file_path):
-    """Process WhatsApp chat data and return statistics counters"""
+    """Process WhatsApp chat data with dynamic user detection"""
     message_pattern = re.compile(
-        r'^(\[)?(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}),?\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s[AP]M)?(?(1)\])?\s+([^:]+):\s+'
+        r'^(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s[APap][Mm])?)\s+-\s+([^:]+):\s+(.+)'
     )
 
     emoji_pattern = re.compile(
@@ -102,8 +101,7 @@ def process_chat_data(file_path):
         u"\U000024C2-\U0001F251"  # Enclosed chars
         u"\U0001F900-\U0001F9FF"  # Supplemental symbols
         u"\U0001FA70-\U0001FAFF"  # Chess symbols
-        "]+", 
-        flags=re.UNICODE
+        "]+", flags=re.UNICODE
     )
 
     def normalize_emojis(emojis):
@@ -111,23 +109,12 @@ def process_chat_data(file_path):
             '\U0001F3FB', '\U0001F3FC', '\U0001F3FD', '\U0001F3FE', '\U0001F3FF',
             '\u2640', '\u2642', '\u200d', '\ufe0f'
         ]
-        normalized = []
-        for emoji in emojis:
-            for mod in modifiers:
-                emoji = emoji.replace(mod, '')
-            for char in emoji:
-                if char.strip() and emoji_pattern.match(char):
-                    normalized.append(char)
-        return normalized
+        return [char for emoji in emojis for char in emoji if char not in modifiers]
 
     counters = {
-        'messages': {'Victor': 0, 'Jonnas': 0, 'Total': 0},
-        'words': {'Victor': 0, 'Jonnas': 0},
-        'emojis': {
-            'Victor': {'total': Counter(), 'messages': Counter()},
-            'Jonnas': {'total': Counter(), 'messages': Counter()},
-            'Both': {'total': Counter(), 'messages': Counter()}
-        },
+        'messages': defaultdict(int),
+        'words': defaultdict(int),
+        'emojis': defaultdict(lambda: {'total': Counter(), 'messages': Counter()}),
         'dates': []
     }
 
@@ -136,60 +123,57 @@ def process_chat_data(file_path):
             match = message_pattern.match(line)
             if not match:
                 continue
-            
+
             try:
-                # Extract message metadata
-                date_str = match.group(2).strip()
-                user = match.group(3).strip().lower()
-                message = line.split(': ', 2)[-1].strip()
+                date_str, user, message = match.groups()
+                user = user.strip().title()
                 
-                # Parse date
+                # Skip system messages
+                if user.lower() in ['system', 'whatsapp'] or 'changed' in user.lower():
+                    continue
+
                 date = date_parse(date_str, dayfirst=True)
                 
-                # Determine user
-                if 'victor' in user:
-                    user_key = 'Victor'
-                elif 'jonnas' in user or 'jonas' in user:
-                    user_key = 'Jonnas'
-                else:
-                    continue
-                
                 # Update counters
-                counters['messages'][user_key] += 1
+                counters['messages'][user] += 1
                 counters['messages']['Total'] += 1
-                counters['words'][user_key] += len(message.split()) if message else 0
-                counters['dates'].append((user_key, date))
+                counters['words'][user] += len(message.split())
+                counters['dates'].append((user, date))
                 
                 # Process emojis
                 found_emojis = emoji_pattern.findall(message)
                 cleaned_emojis = normalize_emojis(found_emojis)
                 unique_emojis = set(cleaned_emojis)
 
-                counters['emojis'][user_key]['total'].update(cleaned_emojis)
-                counters['emojis'][user_key]['messages'].update(unique_emojis)
+                counters['emojis'][user]['total'].update(cleaned_emojis)
+                counters['emojis'][user]['messages'].update(unique_emojis)
                 counters['emojis']['Both']['total'].update(cleaned_emojis)
                 counters['emojis']['Both']['messages'].update(unique_emojis)
-                
+
             except Exception as e:
                 continue
 
     return counters
 
 def calculate_metrics(counters):
-    """Calculate derived metrics from raw counters"""
+    """Calculate metrics with dynamic users"""
     def safe_divide(a, b):
-        return round(a/b, 2) if b > 0 else 0.0
+        return a / b if b > 0 else 0.0
 
-    return {
-        'words_per_message': {
-            'Victor': safe_divide(counters['words']['Victor'], counters['messages']['Victor']),
-            'Jonnas': safe_divide(counters['words']['Jonnas'], counters['messages']['Jonnas']),
-            'Total': safe_divide(
-                counters['words']['Victor'] + counters['words']['Jonnas'],
-                counters['messages']['Total']
-            )
-        }
-    }
+    users = [u for u in counters['messages'] if u != 'Total']
+    metrics = {'words_per_message': {'Total': 0.0}}
+    total_words = sum(counters['words'].values())
+    
+    for user in users:
+        metrics['words_per_message'][user] = safe_divide(
+            counters['words'][user], counters['messages'][user]
+        )
+    
+    metrics['words_per_message']['Total'] = safe_divide(
+        total_words, counters['messages']['Total']
+    )
+
+    return metrics
 
 def main():
     if len(sys.argv) < 2:
@@ -197,26 +181,27 @@ def main():
         sys.exit(1)
 
     CHAT_FILE_PATH = sys.argv[1]
-    
-    # Process data
     counters = process_chat_data(CHAT_FILE_PATH)
     metrics = calculate_metrics(counters)
     
-    # Print text reports
     print_metrics(counters, metrics)
     print_emoji_metrics(counters)
-    
-    # Show timeline plot
     plot_message_timeline(counters)
     
     # Debug info
     print("\nDEBUG INFO:")
     if counters['dates']:
-        print(f"Processed {len(counters['dates'])} messages with date information")
-        print(f"Date range: {counters['dates'][0][1].date()} to {counters['dates'][-1][1].date()}")
+        print(f"Processed {len(counters['dates'])} messages")
+        start = min(d for _, d in counters['dates']).strftime('%Y-%m-%d')
+        end = max(d for _, d in counters['dates']).strftime('%Y-%m-%d')
+        print(f"Date range: {start} to {end}")
     else:
-        print("No date data found")
-    print(f"Victor/Jonnas ratio: {counters['messages']['Victor']}/{counters['messages']['Jonnas']}")
+        print("No valid messages found")
+        
+    print("User distribution:")
+    for user, count in sorted(counters['messages'].items()):
+        if user != 'Total':
+            print(f"- {user}: {count} messages")
 
 if __name__ == "__main__":
     main()
