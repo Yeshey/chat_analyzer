@@ -1,44 +1,59 @@
-# https://github.com/nix-community/dream2nix/tree/main
-
 {
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    systems.url = "github:nix-systems/default";
-  };
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  inputs.poetry2nix.url = "github:nix-community/poetry2nix";
 
-  outputs = { systems, nixpkgs, ... } @ inputs:
-  let
-    eachSystem = f:
-      nixpkgs.lib.genAttrs (import systems) (
-        system:
-          f nixpkgs.legacyPackages.${system}
-      );
-  in {
-    devShells = eachSystem (pkgs: 
+  # built based on this template https://github.com/NixOS/templates/blob/master/python/flake.nix
+  # With the help of this video: https://www.youtube.com/watch?v=oqXWrkvZ59g
+
+  # This issue is why we use unshare --user inkscape: https://gitlab.com/inkscape/inkscape/-/issues/4716 
+
+  outputs = { self, nixpkgs, poetry2nix }:
     let
+      supportedSystems = [ "x86_64-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin" ];
+      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+      pkgs = forAllSystems (system: nixpkgs.legacyPackages.${system});
 
-    in {
-      default = pkgs.mkShell {
-        packages = [
-          #pkgs.jupyter-all
-          (pkgs.python311.withPackages (python-pkgs: with python-pkgs; [
-            tensorflow
-            pandas
-            numpy
-            jupyter
-            matplotlib
-            sympy
-            #torch
-          ]))
-        ];
+      developmentAndRuntimePackages = system: with pkgs.${system}; [ 
+        # Packages besides python go here
+      ];
+    in
+    {
+      packages = forAllSystems (system: let
+        inherit (poetry2nix.lib.mkPoetry2Nix { pkgs = pkgs.${system}; }) mkPoetryApplication;
+      in {
+        default = mkPoetryApplication { 
+          projectDir = self; 
+          #nativeBuildInputs = [
+          #  pkgs.${system}.cmatrix
+          #];
+          #buildInputs = [
+          #  pkgs.${system}.cmatrix
+          #];
+          propagatedBuildInputs = with pkgs.${system}; [
+            
+          ] ++ developmentAndRuntimePackages system; # runTime packages
+        };
+      });
 
-        shellHook = ''
-          echo "Development shell ready!"
-          echo "Run with > jupyter notebook"
+      devShells = forAllSystems (system: let
+        inherit (poetry2nix.lib.mkPoetry2Nix { pkgs = pkgs.${system}; }) mkPoetryEnv;
+      in {
+        default = pkgs.${system}.mkShellNoCC {
+          packages = with pkgs.${system}; [
+            (mkPoetryEnv { projectDir = self; })
+            poetry
+          ] ++ developmentAndRuntimePackages system; # development packages (`nix develop` or `direnv allow`)
+        };
+      });
 
-          # jupyter notebook
-        '';
-      };
-    });
-  };
+      apps = forAllSystems (system: let
+        inherit (poetry2nix.lib.mkPoetry2Nix { pkgs = pkgs.${system}; }) mkPoetryApplication;
+      in {
+        default = {
+          program = "${self.packages.${system}.default}/bin/start";
+          type = "app";
+        };
+      });
+
+    };
 }

@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "chatanalyzer"
+version = "0.1.0"
+description = "Statistics for whatsapp chats, emojis, etc"
+authors = ["Yeshey <41551785+Yeshey@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+matplotlib = "^3.10.1"
+pandas = "^2.2.3"
+python-dateutil = "^2.9.0.post0"
+
+[tool.poetry.scripts]
+start = "chatanalyzer.main:main" # file main, runs function main
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

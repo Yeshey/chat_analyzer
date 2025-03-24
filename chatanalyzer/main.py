@@ -1,9 +1,15 @@
+#!/usr/bin/env python3
+
+import sys
 import re
+import matplotlib  # Import matplotlib first
+matplotlib.use('Agg')  # Set the backend before importing pyplot
 from collections import Counter
 from datetime import datetime
 import matplotlib.pyplot as plt
 import pandas as pd
 from dateutil.parser import parse as date_parse
+
 
 def print_metrics(counters, metrics):
     """Print the main chat statistics metrics"""
@@ -43,7 +49,7 @@ def plot_message_timeline(counters):
     plt.figure(figsize=(14, 7))
     
     # Plot total messages
-    df.resample('M').size().plot(
+    df.resample('ME').size().plot(
         label='Total Messages', 
         color='#2c3e50',
         linewidth=2,
@@ -51,14 +57,14 @@ def plot_message_timeline(counters):
     )
     
     # Plot individual users
-    df[df['user'] == 'Jonnas'].resample('M').size().plot(
+    df[df['user'] == 'Jonnas'].resample('ME').size().plot(
         label='Jonnas', 
         color='#3498db',
         linestyle='--',
         alpha=0.8
     )
     
-    df[df['user'] == 'Victor'].resample('M').size().plot(
+    df[df['user'] == 'Victor'].resample('ME').size().plot(
         label='Victor', 
         color='#e74c3c',
         linestyle='--',
@@ -71,7 +77,13 @@ def plot_message_timeline(counters):
     plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
-    plt.show()
+
+    plt.show() # if this fails its fine, the image is also saved in current directory
+    
+    # Save the plot instead of showing it
+    output_file = 'message_timeline.png'
+    plt.savefig(output_file)
+    print(f"\nPlot saved as {output_file}")
 
 def process_chat_data(file_path):
     """Process WhatsApp chat data and return statistics counters"""
@@ -179,8 +191,12 @@ def calculate_metrics(counters):
         }
     }
 
-if __name__ == "__main__":
-    CHAT_FILE_PATH = "WhatsApp Chat with Victor Hugo Arantes de Carvalho~ 3 💔💔💔.txt"
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python chat_analyzer.py <chat_file>")
+        sys.exit(1)
+
+    CHAT_FILE_PATH = sys.argv[1]
     
     # Process data
     counters = process_chat_data(CHAT_FILE_PATH)
@@ -195,6 +211,12 @@ if __name__ == "__main__":
     
     # Debug info
     print("\nDEBUG INFO:")
-    print(f"Processed {len(counters['dates'])} messages with date information")
-    print(f"Date range: {counters['dates'][0][1].date()} to {counters['dates'][-1][1].date()}")
+    if counters['dates']:
+        print(f"Processed {len(counters['dates'])} messages with date information")
+        print(f"Date range: {counters['dates'][0][1].date()} to {counters['dates'][-1][1].date()}")
+    else:
+        print("No date data found")
     print(f"Victor/Jonnas ratio: {counters['messages']['Victor']}/{counters['messages']['Jonnas']}")
+
+if __name__ == "__main__":
+    main()
