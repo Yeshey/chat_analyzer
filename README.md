@@ -1,4 +1,6 @@
 # chat_analyzer
 Statistics for whatsapp chats, emojis, etc
 
-Inspiered by [Chat Recapai AI](https://chatrecapai.org/)
+Inspired by [Chat Recapai AI](https://chatrecapai.org/)
+
+Used AI to help create this script
